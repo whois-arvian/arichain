@@ -163,11 +163,22 @@ def send_otp(email, proxy_dict, headers, current=None, total=None):
     }
     try:
         response = requests.post(url, data=payload, headers=headers, proxies=proxy_dict, timeout=120)
-        response.raise_for_status()
         
-        # Debug log to view response status and body
-        log(f"Response status code: {response.status_code}", Fore.CYAN, current, total)
-        log(f"Response body: {response.text}", Fore.CYAN, current, total)
+        # Log untuk mengecek status respons dan isi respons
+        log(f"Response Status Code: {response.status_code}", Fore.YELLOW, current, total)
+        log(f"Response Content: {response.text}", Fore.YELLOW, current, total)
+        
+        # Pastikan status code respons adalah 200 (OK)
+        response.raise_for_status()
+
+        # Memastikan respons dapat di-parse sebagai JSON
+        if response.text:
+            try:
+                json_data = response.json()
+                log(f"Response JSON: {json_data}", Fore.GREEN, current, total)
+            except ValueError:
+                log("Response is not valid JSON", Fore.RED, current, total)
+                return False
 
         log(f"OTP code sent to {email}", Fore.YELLOW, current, total)
         return True
