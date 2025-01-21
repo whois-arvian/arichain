@@ -2,7 +2,6 @@ import requests
 import random
 import time
 import string
-import names
 from colorama import Fore, Style, init
 from datetime import datetime
 from bs4 import BeautifulSoup
@@ -24,113 +23,86 @@ ANDROID_USER_AGENTS = [
 
 class TempMailClient:
     def __init__(self, proxy_dict=None):
-        self.base_url = "https://www.email-fake.com/api/v1"
-        self.ua = random.choice(ANDROID_USER_AGENTS)  # Pilih user-agent acak
-        self.proxy_dict = proxy_dict
-        self.current_num = 1  # Misal untuk logging
-        self.total = 10  # Misal total proses yang sedang berjalan
-        self.email_address = None
-        self.inbox_id = None
-
-    def log_message(self, current_num, total, message, level="info"):
-        log_level = {"process": Fore.CYAN, "success": Fore.GREEN, "error": Fore.RED}
-        color = log_level.get(level, Fore.WHITE)
-        print(f"{color}{message}{Fore.RESET}")
-
-    def get_random_domain(self):
-        self.log_message(self.current_num, self.total, "Searching for available email domain...", "process")
-        vowels = 'aeiou'
-        consonants = 'bcdfghjklmnpqrstvwxyz'
-        keyword = random.choice(consonants) + random.choice(vowels)
-        
-        headers = {'User-Agent': self.ua}
-        response = self.make_request('GET', f'https://email-fake.com/search.php?key={keyword}', headers=headers)
-        
-        if not response:
-            return None
-            
-        domains = response.json()
-        valid_domains = [d for d in domains if all(ord(c) < 128 for c in d)]
-        
-        if valid_domains:
-            selected_domain = random.choice(valid_domains)
-            self.log_message(self.current_num, self.total, f"Selected domain: {selected_domain}", "success")
-            return selected_domain
-            
-        self.log_message(self.current_num, self.total, "Could not find valid domain", "error")
-        return None
-
-    def generate_email(self, domain):
-        self.log_message(self.current_num, self.total, "Generating email address...", "process")
-        first_name = random.choice(string.ascii_lowercase)
-        last_name = random.choice(string.ascii_lowercase)
-        random_nums = ''.join(random.choices(string.digits, k=3))
-        
-        separator = random.choice(['', '.'])
-        email = f"{first_name}{separator}{last_name}{random_nums}@{domain}"
-        self.log_message(self.current_num, self.total, f"Email created: {email}", "success")
-        return email
-
-    def create_inbox(self, email):
-        self.log_message(self.current_num, self.total, "Creating inbox...", "process")
-        url = f"{self.base_url}/inbox"
-        params = {
-            'email': email
+        self.base_url = "https://smailpro.com/app"
+        self.inbox_url = "https://app.sonjj.com/v1/temp_gmail"
+        self.headers = {
+            'accept': '*/*',
+            'accept-language': 'en-US,en;q=0.9',
+            'user-agent': random.choice(ANDROID_USER_AGENTS),
+            'origin': 'https://smailpro.com',
+            'referer': 'https://smailpro.com/'
         }
-        response = self.make_request('POST', url, params=params)
+        self.proxy_dict = proxy_dict
+        self.email_address = None
+        self.key = None
+        self.payload = None
+
+    def create_email(self) -> dict:
+        url = f"{self.base_url}/create"
+        params = {
+            'username': 'random',
+            'type': 'alias',
+            'domain': 'gmail.com',
+            'server': '1'
+        }
         
-        if response:
-            self.inbox_id = response.get('inbox_id')
-            self.log_message(self.current_num, self.total, f"Inbox created with ID: {self.inbox_id}", "success")
-            return self.inbox_id
-        return None
-
-    def get_inbox(self):
-        if not self.inbox_id:
-            self.log_message(self.current_num, self.total, "Inbox ID not set.", "error")
-            return None
-        url = f"{self.base_url}/inbox/{self.inbox_id}/messages"
-        response = self.make_request('GET', url)
+        response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
+        data = response.json()
         
-        if response and 'messages' in response:
-            return response['messages']
-        return []
-
-    def get_message_token(self, message_id):
-        # Token adalah message_id itu sendiri di sini
-        return message_id
-
-    def get_message_content(self, token):
-        url = f"{self.base_url}/message/{token}"
-        response = self.make_request('GET', url)
+        self.email_address = data['address']
+        self.key = data['key']
         
-        if response:
-            return response
-        return {}
+        return data
 
-    def extract_otp(self, message_body):
-        # Menggunakan regex untuk mencari angka 6 digit
-        otp_match = re.search(r'\b\d{6}\b', message_body)
-        if otp_match:
-            return otp_match.group(0)
-        return None
+    def create_inbox(self) -> dict:
+        url = f"{self.base_url}/inbox"
+        payload = [{
+            "address": self.email_address,
+            "timestamp": int(time.time()),
+            "key": self.key
+        }]
+        
+        response = requests.post(url, json=payload, headers=self.headers, proxies=self.proxy_dict)
+        data = response.json()
+        
+        if data:
+            self.payload = data[0]['payload']
+        
+        return data[0]
 
-    def make_request(self, method, url, params=None, headers=None):
+    def get_inbox(self) -> dict:
+        url = f"{self.inbox_url}/inbox"
+        params = {'payload': self.payload}
+        
+        response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
+        return response.json()
+
+    def get_message_token(self, mid: str) -> str:
+        url = f"{self.base_url}/message"
+        params = {
+            'email': self.email_address,
+            'mid': mid
+        }
+        
+        response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
+        return response.text
+
+    def get_message_content(self, token: str) -> dict:
+        url = f"{self.inbox_url}/message"
+        params = {'payload': token}
+        
+        response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
+        return response.json()
+
+    def extract_otp(self, html_content: str) -> str:
         try:
-            if method == 'GET':
-                response = requests.get(url, headers=headers, params=params, proxies=self.proxy_dict, timeout=60)
-            elif method == 'POST':
-                response = requests.post(url, headers=headers, json=params, proxies=self.proxy_dict, timeout=60)
-            else:
-                return None
-            
-            if response.status_code == 200:
-                return response.json()
-            else:
-                self.log_message(self.current_num, self.total, f"Request failed: {response.status_code}", "error")
-                return None
-        except requests.exceptions.RequestException as e:
-            self.log_message(self.current_num, self.total, f"Request error: {str(e)}", "error")
+            soup = BeautifulSoup(html_content, 'html.parser')
+            otp_element = soup.find('b', style=lambda value: value and 'letter-spacing:16px' in value)
+            if otp_element:
+                return otp_element.text.strip()
+            return None
+        except Exception as e:
+            log(f"Error extracting OTP: {e}", Fore.RED)
             return None
 
 def get_timestamp():
@@ -305,52 +277,47 @@ def process_single_referral(index, total_referrals, proxy_dict, target_address, 
         print(f"{Fore.CYAN}\nStarting new referral process\n{Style.RESET_ALL}")
 
         mail_client = TempMailClient(proxy_dict)
+        
+        email_data = mail_client.create_email()
+        if not email_data:
+            log("Failed to create email", Fore.RED, index, total_referrals)
+            return False
+            
+        email = email_data['address']
+        password = generate_password()
+        log(f"Generated account: {email}:{password}", Fore.CYAN, index, total_referrals)
 
-        # Mendapatkan domain acak dari email-fake.com
-        domain = mail_client.get_random_domain()
-        if not domain:
-            log("Failed to find valid domain", Fore.RED, index, total_referrals)
+        if not send_otp(email, proxy_dict, headers, index, total_referrals):
+            log("Failed to send OTP.", Fore.RED, index, total_referrals)
             return False
 
-        # Menghasilkan email dengan domain yang ditemukan
-        email = mail_client.generate_email(domain)
-        log(f"Generated email: {email}", Fore.CYAN, index, total_referrals)
-
-        # Membuat inbox untuk email ini
-        inbox_id = mail_client.create_inbox(email)
-        if not inbox_id:
-            log("Failed to create inbox.", Fore.RED, index, total_referrals)
-            return False
-
+        mail_client.create_inbox()
         valid_code = None
         
-        # Cek inbox untuk mencari OTP
         for _ in range(30):
             inbox = mail_client.get_inbox()
-            if inbox:
-                for message in inbox:
-                    token = mail_client.get_message_token(message['id'])
-                    content = mail_client.get_message_content(token)
-                    valid_code = mail_client.extract_otp(content.get('body', ''))
-                    if valid_code:
-                        log(f"Found OTP: {valid_code}", Fore.GREEN, index, total_referrals)
-                        break
-            if valid_code:
-                break
-            time.sleep(2)  # Delay sebelum mencoba lagi
+            if inbox.get('messages'):
+                message = inbox['messages'][0]
+                token = mail_client.get_message_token(message['mid'])
+                content = mail_client.get_message_content(token)
+                valid_code = mail_client.extract_otp(content['body'])
+                if valid_code:
+                    log(f"Found OTP: {valid_code}", Fore.GREEN, index, total_referrals)
+                    break
+            time.sleep(2)
+            mail_client.create_inbox()
 
         if not valid_code:
             log("Failed to get OTP code.", Fore.RED, index, total_referrals)
             return False
 
-        # Lakukan verifikasi OTP dan proses lainnya
-        address = verify_otp(email, valid_code, proxy_dict, ref_code, headers, index, total_referrals)
+        address = verify_otp(email, valid_code, password, proxy_dict, ref_code, headers, index, total_referrals)
         if not address:
             log("Failed to verify OTP.", Fore.RED, index, total_referrals)
             return False
 
         daily_claim(address, proxy_dict, headers, index, total_referrals)
-        auto_send(email, target_address, proxy_dict, headers, index, total_referrals)
+        auto_send(email, target_address, password, proxy_dict, headers, index, total_referrals)
         
         log(f"Referral #{index} completed!", Fore.MAGENTA, index, total_referrals)
         return True
