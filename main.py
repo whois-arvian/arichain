@@ -22,7 +22,6 @@ ANDROID_USER_AGENTS = [
 ]
 
 class TempMailClient:
-class TempMailClient:
     def __init__(self, proxy_dict=None):
         self.base_url = "https://www.email-fake.com/api/v1"
         self.ua = random.choice(ANDROID_USER_AGENTS)  # Pilih user-agent acak
