@@ -161,35 +161,40 @@ def send_otp(email, proxy_dict, headers, current=None, total=None):
         'device': "app",
         'is_mobile': "Y"
     }
+    
     try:
         # Kirim permintaan POST
         response = requests.post(url, data=payload, headers=headers, proxies=proxy_dict, timeout=120)
 
-        # Log untuk status kode dan respons mentah
+        # Log status kode dan respons mentah
         log(f"Response Status Code: {response.status_code}", Fore.YELLOW, current, total)
-        log(f"Response Content: {response.text}", Fore.YELLOW, current, total)
+        log(f"Response Text: {response.text}", Fore.YELLOW, current, total)
 
-        # Pastikan status kode adalah 200 (OK)
+        # Periksa apakah status kode adalah 200 OK
         if response.status_code != 200:
             log(f"Non-200 status code received: {response.status_code}", Fore.RED, current, total)
             return False
         
-        # Jika respons ada, coba parsing JSON
-        if response.text:
-            try:
-                json_data = response.json()
-                log(f"Response JSON: {json_data}", Fore.GREEN, current, total)
-            except ValueError:
-                log(f"Response is not valid JSON: {response.text}", Fore.RED, current, total)
-                return False
-        else:
-            log("Empty response received.", Fore.RED, current, total)
+        # Pastikan bahwa respons memiliki isi
+        if not response.text:
+            log(f"Empty response received from server", Fore.RED, current, total)
+            return False
+        
+        try:
+            # Coba parsing JSON dari respons
+            json_data = response.json()
+            log(f"Response JSON: {json_data}", Fore.GREEN, current, total)
+        except ValueError:
+            # Jika respons bukan JSON yang valid, log respons sebagai teks
+            log(f"Response is not valid JSON: {response.text}", Fore.RED, current, total)
             return False
 
+        # Jika parsing JSON berhasil, lanjutkan
         log(f"OTP code sent to {email}", Fore.YELLOW, current, total)
         return True
 
     except requests.RequestException as e:
+        # Log kesalahan permintaan
         log(f"Failed to send OTP: {e}", Fore.RED, current, total)
         return False
 
