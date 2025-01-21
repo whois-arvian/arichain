@@ -21,27 +21,61 @@ ANDROID_USER_AGENTS = [
     'Mozilla/5.0 (Linux; Android 13; V2169) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36'
 ]
 
-class GuerrillaMailClient:
+class TempMailClient:
     def __init__(self, proxy_dict=None):
-        self.base_url = "https://api.guerrillamail.com/ajax.php"
+        self.base_url = "https://smailpro.com/app"
+        self.inbox_url = "https://app.sonjj.com/v1/temp_gmail"
+        self.headers = {
+            'accept': '*/*',
+            'accept-language': 'en-US,en;q=0.9',
+            'user-agent': random.choice(ANDROID_USER_AGENTS),
+            'origin': 'https://smailpro.com',
+            'referer': 'https://smailpro.com/'
+        }
         self.proxy_dict = proxy_dict
         self.email_address = None
-        self.inbox_id = None
+        self.key = None
+        self.payload = None
 
     def create_email(self) -> dict:
-        # Membuat email baru melalui Guerrilla Mail API
+        url = f"{self.base_url}/create"
         params = {
-            'f': 'new_address'
+            'username': 'random',
+            'type': 'alias',
+            'domain': 'gmail.com',
+            'server': '1'
         }
         
-        response = requests.get(self.base_url, params=params, proxies=self.proxy_dict)
+        response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
         data = response.json()
         
-        if data.get('email_addr'):
-            self.email_address = data['email_addr']
-            self.inbox_id = data['sid']
+        self.email_address = data['address']
+        self.key = data['key']
         
         return data
+
+    def create_inbox(self) -> dict:
+        url = f"{self.base_url}/inbox"
+        payload = [{
+            "address": self.email_address,
+            "timestamp": int(time.time()),
+            "key": self.key
+        }]
+        
+        response = requests.post(url, json=payload, headers=self.headers, proxies=self.proxy_dict)
+        data = response.json()
+        
+        if data:
+            self.payload = data[0]['payload']
+        
+        return data[0]
+
+    # def get_inbox(self) -> dict:
+    #     url = f"{self.inbox_url}/inbox"
+    #     params = {'payload': self.payload}
+        
+    #     response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
+    #     return response.json()
 
     def get_inbox(self):
         url = f"{self.inbox_url}/inbox"
@@ -65,24 +99,29 @@ class GuerrillaMailClient:
             log(f"Request failed: {str(e)}", Fore.RED)
             return {}
 
-    def get_message_token(self, message_id: str) -> str:
-        # Mengambil token dari pesan berdasarkan message_id
+    def get_message_token(self, mid: str) -> str:
+        url = f"{self.base_url}/message"
         params = {
-            'f': 'fetch_email',
-            'sid': self.inbox_id,
-            'email_id': message_id
+            'email': self.email_address,
+            'mid': mid
         }
         
-        response = requests.get(self.base_url, params=params, proxies=self.proxy_dict)
-        return response.json().get('body', '')
+        response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
+        return response.text
+
+    def get_message_content(self, token: str) -> dict:
+        url = f"{self.inbox_url}/message"
+        params = {'payload': token}
+        
+        response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
+        return response.json()
 
     def extract_otp(self, html_content: str) -> str:
-        # Ekstrak OTP dari body pesan HTML
         try:
-            start_idx = html_content.find('Your OTP is:')  # Menyesuaikan dengan format OTP
-            if start_idx != -1:
-                otp = html_content[start_idx + len('Your OTP is:'):start_idx + len('Your OTP is:') + 6].strip()
-                return otp
+            soup = BeautifulSoup(html_content, 'html.parser')
+            otp_element = soup.find('b', style=lambda value: value and 'letter-spacing:16px' in value)
+            if otp_element:
+                return otp_element.text.strip()
             return None
         except Exception as e:
             log(f"Error extracting OTP: {e}", Fore.RED)
@@ -117,24 +156,6 @@ def generate_password():
     numbers = ''.join(random.choices(string.digits, k=3))
     return f"{word.capitalize()}@{numbers}#"
 
-# def send_otp(email, proxy_dict, headers, current=None, total=None):
-#     url = "https://arichain.io/api/email/send_valid_email"
-#     payload = {
-#         'blockchain': "testnet",
-#         'email': email,
-#         'lang': "en",
-#         'device': "app",
-#         'is_mobile': "Y"
-#     }
-#     try:
-#         response = requests.post(url, data=payload, headers=headers, proxies=proxy_dict, timeout=120)
-#         response.raise_for_status()
-#         log(f"OTP code sent to {email}", Fore.YELLOW, current, total)
-#         return True
-#     except requests.RequestException as e:
-#         log(f"Failed to send OTP: {e}", Fore.RED, current, total)
-#         return False
-
 def send_otp(email, proxy_dict, headers, current=None, total=None):
     url = "https://arichain.io/api/email/send_valid_email"
     payload = {
@@ -144,40 +165,12 @@ def send_otp(email, proxy_dict, headers, current=None, total=None):
         'device': "app",
         'is_mobile': "Y"
     }
-    
     try:
-        # Kirim permintaan POST
         response = requests.post(url, data=payload, headers=headers, proxies=proxy_dict, timeout=120)
-
-        # Log status kode dan respons mentah
-        log(f"Response Status Code: {response.status_code}", Fore.YELLOW, current, total)
-        log(f"Response Text: {response.text}", Fore.YELLOW, current, total)
-
-        # Periksa apakah status kode adalah 200 OK
-        if response.status_code != 200:
-            log(f"Non-200 status code received: {response.status_code}", Fore.RED, current, total)
-            return False
-        
-        # Pastikan bahwa respons memiliki isi
-        if not response.text:
-            log(f"Empty response received from server", Fore.RED, current, total)
-            return False
-        
-        try:
-            # Coba parsing JSON dari respons
-            json_data = response.json()
-            log(f"Response JSON: {json_data}", Fore.GREEN, current, total)
-        except ValueError:
-            # Jika respons bukan JSON yang valid, log respons sebagai teks
-            log(f"Response is not valid JSON: {response.text}", Fore.RED, current, total)
-            return False
-
-        # Jika parsing JSON berhasil, lanjutkan
+        response.raise_for_status()
         log(f"OTP code sent to {email}", Fore.YELLOW, current, total)
         return True
-
     except requests.RequestException as e:
-        # Log kesalahan permintaan
         log(f"Failed to send OTP: {e}", Fore.RED, current, total)
         return False
 
@@ -301,114 +294,50 @@ def get_referral_code():
             return code
         log('Please enter a valid referral code.', Fore.YELLOW)
 
-# def process_single_referral(index, total_referrals, proxy_dict, target_address, ref_code, headers):
-#     try:
-#         print(f"{Fore.CYAN}\nStarting new referral process\n{Style.RESET_ALL}")
-
-#         mail_client = GuerrillaMailClient(proxy_dict)
-        
-#         email_data = mail_client.create_email()
-#         if not email_data:
-#             log("Failed to create email", Fore.RED, index, total_referrals)
-#             return False
-            
-#         email = email_data['address']
-#         password = generate_password()
-#         log(f"Generated account: {email}:{password}", Fore.CYAN, index, total_referrals)
-
-#         if not send_otp(email, proxy_dict, headers, index, total_referrals):
-#             log("Failed to send OTP.", Fore.RED, index, total_referrals)
-#             return False
-
-#         mail_client.create_inbox()
-#         valid_code = None
-        
-#         for _ in range(30):
-#             inbox = mail_client.get_inbox()
-#             if inbox.get('messages'):
-#                 message = inbox['messages'][0]
-#                 token = mail_client.get_message_token(message['mid'])
-#                 content = mail_client.get_message_content(token)
-#                 valid_code = mail_client.extract_otp(content['body'])
-#                 if valid_code:
-#                     log(f"Found OTP: {valid_code}", Fore.GREEN, index, total_referrals)
-#                     break
-#             time.sleep(2)
-#             mail_client.create_inbox()
-
-#         if not valid_code:
-#             log("Failed to get OTP code.", Fore.RED, index, total_referrals)
-#             return False
-
-#         address = verify_otp(email, valid_code, password, proxy_dict, ref_code, headers, index, total_referrals)
-#         if not address:
-#             log("Failed to verify OTP.", Fore.RED, index, total_referrals)
-#             return False
-
-#         daily_claim(address, proxy_dict, headers, index, total_referrals)
-#         auto_send(email, target_address, password, proxy_dict, headers, index, total_referrals)
-        
-#         log(f"Referral #{index} completed!", Fore.MAGENTA, index, total_referrals)
-#         return True
-        
-#     except Exception as e:
-#         log(f"Error occurred: {str(e)}.", Fore.RED, index, total_referrals)
-#         return False
-
 def process_single_referral(index, total_referrals, proxy_dict, target_address, ref_code, headers):
     try:
         print(f"{Fore.CYAN}\nStarting new referral process\n{Style.RESET_ALL}")
 
-        # Inisialisasi mail client untuk GuerrillaMail
-        mail_client = GuerrillaMailClient(proxy_dict)
+        mail_client = TempMailClient(proxy_dict)
         
-        # Membuat email sementara
         email_data = mail_client.create_email()
         if not email_data:
             log("Failed to create email", Fore.RED, index, total_referrals)
             return False
             
-        email = mail_client.email_address
+        email = email_data['address']
         password = generate_password()
         log(f"Generated account: {email}:{password}", Fore.CYAN, index, total_referrals)
 
-        # Log sebelum memanggil fungsi send_otp untuk konfirmasi
-        log(f"Attempting to send OTP to: {email}", Fore.CYAN, index, total_referrals)
         if not send_otp(email, proxy_dict, headers, index, total_referrals):
             log("Failed to send OTP.", Fore.RED, index, total_referrals)
             return False
-        
-        # Log setelah OTP berhasil dikirim
-        log(f"OTP sent successfully to {email}. Now checking inbox.", Fore.GREEN, index, total_referrals)
 
-        # Coba 30 kali untuk mendapatkan OTP dari inbox
+        mail_client.create_inbox()
         valid_code = None
-        for _ in range(30):  # Retry for 30 attempts
+        
+        for _ in range(30):
             inbox = mail_client.get_inbox()
-            if inbox.get('emails'):
-                message = inbox['emails'][0]
-                message_id = message['mail_id']
-                content = mail_client.get_message_token(message_id)
-                valid_code = mail_client.extract_otp(content)
+            if inbox.get('messages'):
+                message = inbox['messages'][0]
+                token = mail_client.get_message_token(message['mid'])
+                content = mail_client.get_message_content(token)
+                valid_code = mail_client.extract_otp(content['body'])
                 if valid_code:
                     log(f"Found OTP: {valid_code}", Fore.GREEN, index, total_referrals)
                     break
-            else:
-                log("No messages found in inbox, retrying...", Fore.YELLOW, index, total_referrals)
-
-            time.sleep(2)  # Tunggu 2 detik sebelum mencoba lagi
+            time.sleep(2)
+            mail_client.create_inbox()
 
         if not valid_code:
             log("Failed to get OTP code.", Fore.RED, index, total_referrals)
             return False
 
-        # Verifikasi OTP yang diterima
         address = verify_otp(email, valid_code, password, proxy_dict, ref_code, headers, index, total_referrals)
         if not address:
             log("Failed to verify OTP.", Fore.RED, index, total_referrals)
             return False
 
-        # Proses claim dan pengiriman otomatis
         daily_claim(address, proxy_dict, headers, index, total_referrals)
         auto_send(email, target_address, password, proxy_dict, headers, index, total_referrals)
         
@@ -416,9 +345,7 @@ def process_single_referral(index, total_referrals, proxy_dict, target_address, 
         return True
         
     except Exception as e:
-        # Tambahkan logging yang lebih mendetail
-        log(f"Error occurred: {str(e)}", Fore.RED, index, total_referrals)
-        log(f"Full exception details: {repr(e)}", Fore.RED, index, total_referrals)
+        log(f"Error occurred: {str(e)}.", Fore.RED, index, total_referrals)
         return False
 
 def main():
