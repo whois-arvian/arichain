@@ -258,14 +258,16 @@ def get_referral_count():
 
 def get_target_address():
     while True:
-        address = ask('Enter main account address for auto-send: ').strip()
+        # address = ask('Enter main account address for auto-send: ').strip()
+        address = "ARW8aoHAoS6nAbn8dXVruS75wH5smx6obZvK1Xdwv6iYUbJ9Mf9dV"
         if address:
             return address
         log('Please enter a valid address.', Fore.YELLOW)
 
 def get_referral_code():
     while True:
-        code = ask('Enter your referral code: ').strip()
+        # code = ask('Enter your referral code: ').strip()
+        code ="6790105b401b3"
         if code:
             return code
         log('Please enter a valid referral code.', Fore.YELLOW)
