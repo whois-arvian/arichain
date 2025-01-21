@@ -43,15 +43,27 @@ class GuerrillaMailClient:
         
         return data
 
-    def get_inbox(self) -> dict:
-        # Mengambil pesan dari inbox
-        params = {
-            'f': 'view_email',
-            'sid': self.inbox_id
-        }
+    def get_inbox(self):
+        url = f"{self.inbox_url}/inbox"
+        params = {'payload': self.payload}
         
-        response = requests.get(self.base_url, params=params, proxies=self.proxy_dict)
-        return response.json()
+        try:
+            response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
+
+            # Log response text untuk memastikan itu JSON
+            log(f"Response Text: {response.text}", Fore.YELLOW)
+
+            # Cek jika respons adalah JSON
+            try:
+                return response.json()
+            except ValueError as e:
+                log(f"JSON decoding error: {str(e)}", Fore.RED)
+                log(f"Response was: {response.text}", Fore.RED)  # Log content yang tidak bisa didecode
+                return {}
+
+        except requests.exceptions.RequestException as e:
+            log(f"Request failed: {str(e)}", Fore.RED)
+            return {}
 
     def get_message_token(self, message_id: str) -> str:
         # Mengambil token dari pesan berdasarkan message_id
