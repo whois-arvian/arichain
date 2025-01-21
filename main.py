@@ -39,8 +39,12 @@ class TempMailClient:
 
     def get_random_domain(self):
         self.log_message(self.current_num, self.total, "Searching for available email domain...", "process")
+        vowels = 'aeiou'
+        consonants = 'bcdfghjklmnpqrstvwxyz'
+        keyword = random.choice(consonants) + random.choice(vowels)
+        
         headers = {'User-Agent': self.ua}
-        response = self.make_request('GET', f'https://email-fake.com/search.php?key={random.choice(string.ascii_lowercase)}', headers=headers)
+        response = self.make_request('GET', f'https://email-fake.com/search.php?key={keyword}', headers=headers)
         
         if not response:
             return None
