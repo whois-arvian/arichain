@@ -23,14 +23,14 @@ ANDROID_USER_AGENTS = [
 
 class TempMailClient:
     def __init__(self, proxy_dict=None):
-        self.base_url = "https://smailpro.com/app"
+        self.base_url = "https://temp-mail.io/en"
         self.inbox_url = "https://app.sonjj.com/v1/temp_gmail"
         self.headers = {
             'accept': '*/*',
             'accept-language': 'en-US,en;q=0.9',
             'user-agent': random.choice(ANDROID_USER_AGENTS),
-            'origin': 'https://smailpro.com',
-            'referer': 'https://smailpro.com/'
+            'origin': 'https://temp-mail.io',
+            'referer': 'https://temp-mail.io/'
         }
         self.proxy_dict = proxy_dict
         self.email_address = None
@@ -134,6 +134,24 @@ def generate_password():
     numbers = ''.join(random.choices(string.digits, k=3))
     return f"{word.capitalize()}@{numbers}#"
 
+# def send_otp(email, proxy_dict, headers, current=None, total=None):
+#     url = "https://arichain.io/api/email/send_valid_email"
+#     payload = {
+#         'blockchain': "testnet",
+#         'email': email,
+#         'lang': "en",
+#         'device': "app",
+#         'is_mobile': "Y"
+#     }
+#     try:
+#         response = requests.post(url, data=payload, headers=headers, proxies=proxy_dict, timeout=120)
+#         response.raise_for_status()
+#         log(f"OTP code sent to {email}", Fore.YELLOW, current, total)
+#         return True
+#     except requests.RequestException as e:
+#         log(f"Failed to send OTP: {e}", Fore.RED, current, total)
+#         return False
+
 def send_otp(email, proxy_dict, headers, current=None, total=None):
     url = "https://arichain.io/api/email/send_valid_email"
     payload = {
@@ -146,6 +164,11 @@ def send_otp(email, proxy_dict, headers, current=None, total=None):
     try:
         response = requests.post(url, data=payload, headers=headers, proxies=proxy_dict, timeout=120)
         response.raise_for_status()
+        
+        # Debug log to view response status and body
+        log(f"Response status code: {response.status_code}", Fore.CYAN, current, total)
+        log(f"Response body: {response.text}", Fore.CYAN, current, total)
+
         log(f"OTP code sent to {email}", Fore.YELLOW, current, total)
         return True
     except requests.RequestException as e:
@@ -272,6 +295,60 @@ def get_referral_code():
             return code
         log('Please enter a valid referral code.', Fore.YELLOW)
 
+# def process_single_referral(index, total_referrals, proxy_dict, target_address, ref_code, headers):
+#     try:
+#         print(f"{Fore.CYAN}\nStarting new referral process\n{Style.RESET_ALL}")
+
+#         mail_client = TempMailClient(proxy_dict)
+        
+#         email_data = mail_client.create_email()
+#         if not email_data:
+#             log("Failed to create email", Fore.RED, index, total_referrals)
+#             return False
+            
+#         email = email_data['address']
+#         password = generate_password()
+#         log(f"Generated account: {email}:{password}", Fore.CYAN, index, total_referrals)
+
+#         if not send_otp(email, proxy_dict, headers, index, total_referrals):
+#             log("Failed to send OTP.", Fore.RED, index, total_referrals)
+#             return False
+
+#         mail_client.create_inbox()
+#         valid_code = None
+        
+#         for _ in range(30):
+#             inbox = mail_client.get_inbox()
+#             if inbox.get('messages'):
+#                 message = inbox['messages'][0]
+#                 token = mail_client.get_message_token(message['mid'])
+#                 content = mail_client.get_message_content(token)
+#                 valid_code = mail_client.extract_otp(content['body'])
+#                 if valid_code:
+#                     log(f"Found OTP: {valid_code}", Fore.GREEN, index, total_referrals)
+#                     break
+#             time.sleep(2)
+#             mail_client.create_inbox()
+
+#         if not valid_code:
+#             log("Failed to get OTP code.", Fore.RED, index, total_referrals)
+#             return False
+
+#         address = verify_otp(email, valid_code, password, proxy_dict, ref_code, headers, index, total_referrals)
+#         if not address:
+#             log("Failed to verify OTP.", Fore.RED, index, total_referrals)
+#             return False
+
+#         daily_claim(address, proxy_dict, headers, index, total_referrals)
+#         auto_send(email, target_address, password, proxy_dict, headers, index, total_referrals)
+        
+#         log(f"Referral #{index} completed!", Fore.MAGENTA, index, total_referrals)
+#         return True
+        
+#     except Exception as e:
+#         log(f"Error occurred: {str(e)}.", Fore.RED, index, total_referrals)
+#         return False
+
 def process_single_referral(index, total_referrals, proxy_dict, target_address, ref_code, headers):
     try:
         print(f"{Fore.CYAN}\nStarting new referral process\n{Style.RESET_ALL}")
@@ -287,14 +364,19 @@ def process_single_referral(index, total_referrals, proxy_dict, target_address, 
         password = generate_password()
         log(f"Generated account: {email}:{password}", Fore.CYAN, index, total_referrals)
 
+        # Log before calling send_otp to confirm it's being triggered
+        log(f"Attempting to send OTP to: {email}", Fore.CYAN, index, total_referrals)
         if not send_otp(email, proxy_dict, headers, index, total_referrals):
             log("Failed to send OTP.", Fore.RED, index, total_referrals)
             return False
+        
+        # Log after OTP is successfully sent
+        log(f"OTP sent successfully to {email}. Now checking inbox.", Fore.GREEN, index, total_referrals)
 
         mail_client.create_inbox()
         valid_code = None
         
-        for _ in range(30):
+        for _ in range(30):  # Retry for 30 attempts
             inbox = mail_client.get_inbox()
             if inbox.get('messages'):
                 message = inbox['messages'][0]
@@ -304,7 +386,10 @@ def process_single_referral(index, total_referrals, proxy_dict, target_address, 
                 if valid_code:
                     log(f"Found OTP: {valid_code}", Fore.GREEN, index, total_referrals)
                     break
-            time.sleep(2)
+            else:
+                log("No messages found in inbox, retrying...", Fore.YELLOW, index, total_referrals)
+
+            time.sleep(2)  # Wait for 2 seconds before retrying
             mail_client.create_inbox()
 
         if not valid_code:
