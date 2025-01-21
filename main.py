@@ -21,85 +21,56 @@ ANDROID_USER_AGENTS = [
     'Mozilla/5.0 (Linux; Android 13; V2169) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36'
 ]
 
-class TempMailClient:
+class GuerrillaMailClient:
     def __init__(self, proxy_dict=None):
-        self.base_url = "https://temp-mail.io/en"
-        self.inbox_url = "https://app.sonjj.com/v1/temp_gmail"
-        self.headers = {
-            'accept': '*/*',
-            'accept-language': 'en-US,en;q=0.9',
-            'user-agent': random.choice(ANDROID_USER_AGENTS),
-            'origin': 'https://temp-mail.io',
-            'referer': 'https://temp-mail.io/'
-        }
+        self.base_url = "https://api.guerrillamail.com/ajax.php"
         self.proxy_dict = proxy_dict
         self.email_address = None
-        self.key = None
-        self.payload = None
+        self.inbox_id = None
 
     def create_email(self) -> dict:
-        url = f"{self.base_url}/create"
+        # Membuat email baru melalui Guerrilla Mail API
         params = {
-            'username': 'random',
-            'type': 'alias',
-            'domain': 'gmail.com',
-            'server': '1'
+            'f': 'new_address'
         }
         
-        response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
+        response = requests.get(self.base_url, params=params, proxies=self.proxy_dict)
         data = response.json()
         
-        self.email_address = data['address']
-        self.key = data['key']
+        if data.get('email_addr'):
+            self.email_address = data['email_addr']
+            self.inbox_id = data['sid']
         
         return data
 
-    def create_inbox(self) -> dict:
-        url = f"{self.base_url}/inbox"
-        payload = [{
-            "address": self.email_address,
-            "timestamp": int(time.time()),
-            "key": self.key
-        }]
-        
-        response = requests.post(url, json=payload, headers=self.headers, proxies=self.proxy_dict)
-        data = response.json()
-        
-        if data:
-            self.payload = data[0]['payload']
-        
-        return data[0]
-
     def get_inbox(self) -> dict:
-        url = f"{self.inbox_url}/inbox"
-        params = {'payload': self.payload}
-        
-        response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
-        return response.json()
-
-    def get_message_token(self, mid: str) -> str:
-        url = f"{self.base_url}/message"
+        # Mengambil pesan dari inbox
         params = {
-            'email': self.email_address,
-            'mid': mid
+            'f': 'view_email',
+            'sid': self.inbox_id
         }
         
-        response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
-        return response.text
-
-    def get_message_content(self, token: str) -> dict:
-        url = f"{self.inbox_url}/message"
-        params = {'payload': token}
-        
-        response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
+        response = requests.get(self.base_url, params=params, proxies=self.proxy_dict)
         return response.json()
 
+    def get_message_token(self, message_id: str) -> str:
+        # Mengambil token dari pesan berdasarkan message_id
+        params = {
+            'f': 'fetch_email',
+            'sid': self.inbox_id,
+            'email_id': message_id
+        }
+        
+        response = requests.get(self.base_url, params=params, proxies=self.proxy_dict)
+        return response.json().get('body', '')
+
     def extract_otp(self, html_content: str) -> str:
+        # Ekstrak OTP dari body pesan HTML
         try:
-            soup = BeautifulSoup(html_content, 'html.parser')
-            otp_element = soup.find('b', style=lambda value: value and 'letter-spacing:16px' in value)
-            if otp_element:
-                return otp_element.text.strip()
+            start_idx = html_content.find('Your OTP is:')  # Menyesuaikan dengan format OTP
+            if start_idx != -1:
+                otp = html_content[start_idx + len('Your OTP is:'):start_idx + len('Your OTP is:') + 6].strip()
+                return otp
             return None
         except Exception as e:
             log(f"Error extracting OTP: {e}", Fore.RED)
@@ -322,7 +293,7 @@ def get_referral_code():
 #     try:
 #         print(f"{Fore.CYAN}\nStarting new referral process\n{Style.RESET_ALL}")
 
-#         mail_client = TempMailClient(proxy_dict)
+#         mail_client = GuerrillaMailClient(proxy_dict)
         
 #         email_data = mail_client.create_email()
 #         if not email_data:
@@ -376,54 +347,56 @@ def process_single_referral(index, total_referrals, proxy_dict, target_address, 
     try:
         print(f"{Fore.CYAN}\nStarting new referral process\n{Style.RESET_ALL}")
 
-        mail_client = TempMailClient(proxy_dict)
+        # Inisialisasi mail client untuk GuerrillaMail
+        mail_client = GuerrillaMailClient(proxy_dict)
         
+        # Membuat email sementara
         email_data = mail_client.create_email()
         if not email_data:
             log("Failed to create email", Fore.RED, index, total_referrals)
             return False
             
-        email = email_data['address']
+        email = mail_client.email_address
         password = generate_password()
         log(f"Generated account: {email}:{password}", Fore.CYAN, index, total_referrals)
 
-        # Log before calling send_otp to confirm it's being triggered
+        # Log sebelum memanggil fungsi send_otp untuk konfirmasi
         log(f"Attempting to send OTP to: {email}", Fore.CYAN, index, total_referrals)
         if not send_otp(email, proxy_dict, headers, index, total_referrals):
             log("Failed to send OTP.", Fore.RED, index, total_referrals)
             return False
         
-        # Log after OTP is successfully sent
+        # Log setelah OTP berhasil dikirim
         log(f"OTP sent successfully to {email}. Now checking inbox.", Fore.GREEN, index, total_referrals)
 
-        mail_client.create_inbox()
+        # Coba 30 kali untuk mendapatkan OTP dari inbox
         valid_code = None
-        
         for _ in range(30):  # Retry for 30 attempts
             inbox = mail_client.get_inbox()
-            if inbox.get('messages'):
-                message = inbox['messages'][0]
-                token = mail_client.get_message_token(message['mid'])
-                content = mail_client.get_message_content(token)
-                valid_code = mail_client.extract_otp(content['body'])
+            if inbox.get('emails'):
+                message = inbox['emails'][0]
+                message_id = message['mail_id']
+                content = mail_client.get_message_token(message_id)
+                valid_code = mail_client.extract_otp(content)
                 if valid_code:
                     log(f"Found OTP: {valid_code}", Fore.GREEN, index, total_referrals)
                     break
             else:
                 log("No messages found in inbox, retrying...", Fore.YELLOW, index, total_referrals)
 
-            time.sleep(2)  # Wait for 2 seconds before retrying
-            mail_client.create_inbox()
+            time.sleep(2)  # Tunggu 2 detik sebelum mencoba lagi
 
         if not valid_code:
             log("Failed to get OTP code.", Fore.RED, index, total_referrals)
             return False
 
+        # Verifikasi OTP yang diterima
         address = verify_otp(email, valid_code, password, proxy_dict, ref_code, headers, index, total_referrals)
         if not address:
             log("Failed to verify OTP.", Fore.RED, index, total_referrals)
             return False
 
+        # Proses claim dan pengiriman otomatis
         daily_claim(address, proxy_dict, headers, index, total_referrals)
         auto_send(email, target_address, password, proxy_dict, headers, index, total_referrals)
         
