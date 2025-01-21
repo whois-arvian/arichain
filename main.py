@@ -2,6 +2,7 @@ import requests
 import random
 import time
 import string
+import names
 from colorama import Fore, Style, init
 from datetime import datetime
 from bs4 import BeautifulSoup
