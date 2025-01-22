@@ -412,7 +412,7 @@ async def get_otp(email, domain):
                     file.write(response.text)
 
                 if mailextra:
-                    otp = mailextra.find('b', {'style': "letter-spacing: 16px; color: #fff; font-size: 40px; font-weight: 600; font-family: 'pretendard','\00b3cb\00c6c0',dotum,sans-serif!important;"})
+                    otp = mailextra.find('b', {'style': lambda value: value and 'font-size: 40px' in value and 'color: #fff' in value})
 
                     if otp:
                         otp_value = otp.text.strip()
