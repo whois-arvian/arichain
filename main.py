@@ -409,9 +409,13 @@ async def get_otp(email, domain):
                 mailextra = soup.find('p', {'class': 'mailextra'})         
 
                 with open(file_name, 'w', encoding='utf-8') as file:
-                    file.write(mailextra.text)
+                    file.write(response.text)
 
                 if mailextra:
+                    mailextra_content = mailextra.prettify()  # Mengambil HTML terformat
+                    with open('mailextra_content.html', 'w', encoding='utf-8') as file:
+                        file.write(mailextra_content)
+                        
                     otp = mailextra.find('b', {'style': lambda value: value and 'font-size: 40px' in value and 'color: #fff' in value})
 
                     if otp:
