@@ -2,27 +2,11 @@ import requests
 import random
 import time
 import string
-import names
 from colorama import Fore, Style, init
 from datetime import datetime
 from bs4 import BeautifulSoup
-from fake_useragent import UserAgent
-from faker import Faker
-from pyquery import PyQuery as pq
-import asyncio
 
 init()
-
-fake = Faker()
-ua = UserAgent()
-file_name = "response_output.txt"
-
-# Konfigurasi untuk retry saat mengambil domain
-max_retries = 3
-delay_time = 3
-axios_config = {
-    'timeout': 5000  # Waktu tunggu (ms) untuk permintaan HTTP
-}
 
 ANDROID_USER_AGENTS = [
     'Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36',
@@ -37,25 +21,89 @@ ANDROID_USER_AGENTS = [
     'Mozilla/5.0 (Linux; Android 13; V2169) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36'
 ]
 
-model = None
-successful_accounts = 0
-failed_accounts = 0
+class TempMailClient:
+    def __init__(self, proxy_dict=None):
+        self.base_url = "https://smailpro.com/app"
+        self.inbox_url = "https://app.sonjj.com/v1/temp_gmail"
+        self.headers = {
+            'accept': '*/*',
+            'accept-language': 'en-US,en;q=0.9',
+            'user-agent': random.choice(ANDROID_USER_AGENTS),
+            'origin': 'https://smailpro.com',
+            'referer': 'https://smailpro.com/'
+        }
+        self.proxy_dict = proxy_dict
+        self.email_address = None
+        self.key = None
+        self.payload = None
 
-def get_headers(token=None):
-    headers = {
-        'accept': '/',
-        'accept-language': 'en-US,en;q=0.9',
-        'priority': 'u=1, i',
-        'sec-ch-ua-mobile': '?0',
-        'sec-ch-ua-platform': '"Windows"',
-        'sec-fetch-dest': 'empty',
-        'sec-fetch-mode': 'cors',
-        'sec-fetch-site': 'cross-site',
-        'user-agent': ua.chrome
-    }
-    if token:
-        headers['Authorization'] = f'Bearer {token}'
-    return headers
+    def create_email(self) -> dict:
+        url = f"{self.base_url}/create"
+        params = {
+            'username': 'random',
+            'type': 'alias',
+            'domain': 'gmail.com',
+            'server': '1'
+        }
+        
+        response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
+        data = response.json()
+        
+        self.email_address = data['address']
+        self.key = data['key']
+        
+        return data
+
+    def create_inbox(self) -> dict:
+        url = f"{self.base_url}/inbox"
+        payload = [{
+            "address": self.email_address,
+            "timestamp": int(time.time()),
+            "key": self.key
+        }]
+        
+        response = requests.post(url, json=payload, headers=self.headers, proxies=self.proxy_dict)
+        data = response.json()
+        
+        if data:
+            self.payload = data[0]['payload']
+        
+        return data[0]
+
+    def get_inbox(self) -> dict:
+        url = f"{self.inbox_url}/inbox"
+        params = {'payload': self.payload}
+        
+        response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
+        return response.json()
+
+    def get_message_token(self, mid: str) -> str:
+        url = f"{self.base_url}/message"
+        params = {
+            'email': self.email_address,
+            'mid': mid
+        }
+        
+        response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
+        return response.text
+
+    def get_message_content(self, token: str) -> dict:
+        url = f"{self.inbox_url}/message"
+        params = {'payload': token}
+        
+        response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
+        return response.json()
+
+    def extract_otp(self, html_content: str) -> str:
+        try:
+            soup = BeautifulSoup(html_content, 'html.parser')
+            otp_element = soup.find('b', style=lambda value: value and 'letter-spacing:16px' in value)
+            if otp_element:
+                return otp_element.text.strip()
+            return None
+        except Exception as e:
+            log(f"Error extracting OTP: {e}", Fore.RED)
+            return None
 
 def get_timestamp():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -80,52 +128,6 @@ def load_proxies():
 
 def get_random_proxy(proxies):
     return random.choice(proxies) if proxies else None
-
-def delay(seconds):
-    time.sleep(seconds)
-
-# Fungsi untuk mendapatkan domain acak dari API
-def get_domains():
-    attempt = 0
-    while attempt < max_retries:
-        try:
-            key = ''.join(random.choices(string.ascii_lowercase, k=2))  # 2 karakter acak
-            print(f"[*] Fetching domains with key: {key}")
-            
-            response = requests.get(f"https://generator.email/search.php?key={key}", headers={'User-Agent': 'Mozilla/5.0'})
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list) and len(data) > 0:
-                    return data
-            attempt += 1
-            delay(2)
-        except requests.exceptions.RequestException as e:
-            print(f"[!] Error fetching domains: {e}")
-            attempt += 1
-            delay(2)
-    
-    return []
-
-# Fungsi untuk mengencode string menjadi base64 (jika diperlukan)
-def encode_base64(s):
-    return s.encode('utf-8').encode('base64')
-
-# Fungsi untuk menghasilkan email acak
-def random_email(domain):
-    first_name = fake.first_name()
-    last_name = fake.last_name()
-
-    # Bersihkan nama depan dan belakang dari karakter selain huruf
-    clean_first_name = ''.join(filter(str.isalpha, first_name))
-    clean_last_name = ''.join(filter(str.isalpha, last_name))
-
-    random_num = random.randint(100, 999)
-    email_name = f"{clean_first_name.lower()}-AR-{clean_last_name.lower()}{random_num}"
-
-    return {
-        'name': email_name,
-        'email': f"{email_name}@{domain}"
-    }
 
 def generate_password():
     word = ''.join(random.choices(string.ascii_letters, k=5))
@@ -274,171 +276,56 @@ def process_single_referral(index, total_referrals, proxy_dict, target_address, 
     try:
         print(f"{Fore.CYAN}\nStarting new referral process\n{Style.RESET_ALL}")
 
-        # Dapatkan domain email acak
-        domains = get_domains()
-        if not domains:
-            log("Failed to get a valid domain", Fore.RED, index, total_referrals)
+        mail_client = TempMailClient(proxy_dict)
+        
+        email_data = mail_client.create_email()
+        if not email_data:
+            log("Failed to create email", Fore.RED, index, total_referrals)
             return False
-        domain = random.choice(domains)
-
-        # Buat email baru dengan domain yang dipilih
-        email_data = random_email(domain)
-        email = email_data['email']
-        password = generate_password()  # Pastikan ada fungsi generate_password()
+            
+        email = email_data['address']
+        password = generate_password()
         log(f"Generated account: {email}:{password}", Fore.CYAN, index, total_referrals)
 
-        # Kirim OTP ke email
         if not send_otp(email, proxy_dict, headers, index, total_referrals):
             log("Failed to send OTP.", Fore.RED, index, total_referrals)
             return False
 
-        # Tunggu OTP masuk ke inbox
-        valid_code = asyncio.run(get_otp(email, domain))
+        mail_client.create_inbox()
+        valid_code = None
+        
+        for _ in range(30):
+            inbox = mail_client.get_inbox()
+            if inbox.get('messages'):
+                message = inbox['messages'][0]
+                token = mail_client.get_message_token(message['mid'])
+                content = mail_client.get_message_content(token)
+                valid_code = mail_client.extract_otp(content['body'])
+                if valid_code:
+                    log(f"Found OTP: {valid_code}", Fore.GREEN, index, total_referrals)
+                    break
+            time.sleep(2)
+            mail_client.create_inbox()
+
         if not valid_code:
-            log("Failed to retrieve OTP.", Fore.RED, index, total_referrals)
+            log("Failed to get OTP code.", Fore.RED, index, total_referrals)
             return False
 
-        log_message(f"OTP Valid: {valid_code}", "success")
-
-        # Verifikasi OTP
         address = verify_otp(email, valid_code, password, proxy_dict, ref_code, headers, index, total_referrals)
         if not address:
             log("Failed to verify OTP.", Fore.RED, index, total_referrals)
             return False
 
-        # Lakukan langkah tambahan seperti daily claim atau auto-send
         daily_claim(address, proxy_dict, headers, index, total_referrals)
         auto_send(email, target_address, password, proxy_dict, headers, index, total_referrals)
-
+        
         log(f"Referral #{index} completed!", Fore.MAGENTA, index, total_referrals)
         return True
-
+        
     except Exception as e:
         log(f"Error occurred: {str(e)}.", Fore.RED, index, total_referrals)
         log(f"Full exception details: {repr(e)}", Fore.RED, index, total_referrals)
         return False
-
-def get_random_domain(proxies):
-    log_message("Searching for available email domain...", "process")
-    vowels = 'aeiou'
-    consonants = 'bcdfghjklmnpqrstvwxyz'
-    keyword = random.choice(consonants) + random.choice(vowels)
-
-    retry_count = 0
-    while retry_count < max_retries:
-        try:
-            response = requests.get(
-                f'https://generator.email/search.php?key={keyword}',
-                headers=get_headers(),
-                proxies=proxies,
-                timeout=120
-            )
-            domains = response.json()
-            valid_domains = [d for d in domains if all(ord(c) < 128 for c in d)]
-
-            if valid_domains:
-                selected_domain = random.choice(valid_domains)
-                log_message(f"Selected domain: {selected_domain}", "success")
-                return selected_domain
-
-            log_message("Could not find valid domain", "error")
-            return None
-
-        except Exception as e:
-            retry_count += 1
-            if retry_count < max_retries:
-                log_message(f"Connection error: {str(e)}. Retrying... ({retry_count}/{max_retries})", "warning")
-            else:
-                log_message(f"Error getting domain after {max_retries} attempts: {str(e)}", "error")
-                return None
-
-def log_message(message: str, message_type: str = "info"):
-    """
-    Log a message with a specified type.
-
-    :param message: The message to log
-    :param message_type: The type of the message ('info', 'success', 'warning', 'error', 'process')
-    """
-    colors = {
-        "info": Fore.BLUE,
-        "success": Fore.GREEN,
-        "warning": Fore.YELLOW,
-        "error": Fore.RED,
-        "process": Fore.CYAN,
-    }
-    color = colors.get(message_type, Fore.WHITE)
-    print(f"{color}[{message_type.upper()}] {message}{Style.RESET_ALL}")
-
-def generate_email(domain):
-    log_message("Generating email address...", "process")
-    first_name = names.get_first_name().lower()
-    last_name = names.get_last_name().lower()
-    random_nums = ''.join(random.choices(string.digits, k=3))
-
-    separator = random.choice(['', '.'])
-    email = f"{first_name}{separator}{last_name}{random_nums}@{domain}"
-    log_message(f"Email created: {email}", "success")
-    return email
-
-async def get_otp(email, domain):
-    cookies = {
-        'embx': f'[%22{email}%22]',
-        'surl': f'{domain}/{email.split("@")[0]}'
-    }
-    
-    for inbox_num in range(1, 10):  # Checking inbox from 1 to 9
-        attempt = 0
-        while attempt < max_retries:
-            try:
-                log_message(f"[*] Checking inbox {inbox_num}...", "process")
-
-                # Send GET request to the inbox
-                response = requests.get(
-                    f'https://generator.email/inbox{inbox_num}/',
-                    headers={
-                        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-                        'accept-encoding': 'gzip, deflate, br, zstd',
-                        'accept-language': 'en-GB,en;q=0.8',
-                        'cookie': 'soundnotification=on; embx=%5B%22darlene.hill279%40dog.animail.kro.kr%22%5D; surl=dog.animail.kro.kr%2Fdarlene.hill279%2Ffb6e5e120006a51f24913a6c0ac5437b',  # Adjust this according to your cookie needs
-                        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36'
-                    }
-                )
-
-                # Parse the HTML response
-                soup = BeautifulSoup(response.text, 'html.parser')
-                mailextra = soup.find('p', {'class': 'mailextra'})         
-
-                with open(file_name, 'w', encoding='utf-8') as file:
-                    file.write(response.text)
-
-                if mailextra:
-                    mailextra_content = mailextra.prettify()  # Mengambil HTML terformat
-                    with open('mailextra_content.html', 'w', encoding='utf-8') as file:
-                        file.write(mailextra_content)
-                        
-                    otp = mailextra.find('b', {'style': lambda value: value and 'font-size: 40px' in value and 'color: #fff' in value})
-
-                    if otp:
-                        otp_value = otp.text.strip()
-                        print(f"[+] OTP found: {otp_value}")
-                        return otp_value
-
-                log_message(f"[!] No OTP found in inbox {inbox_num}, waiting {delay_time} seconds...", "warning")
-                time.sleep(delay_time)  # Delay before retrying
-                break  # Exit the current inbox checking loop
-
-            except Exception as e:
-                log_message(f"[!] Error checking inbox {inbox_num}: {str(e)}", "error")
-                attempt += 1
-                if attempt < max_retries:
-                    log_message(f"Retrying... ({attempt}/{max_retries})", "warning")
-                    time.sleep(delay_time)  # Wait before retrying
-                else:
-                    log_message("Max retries reached, moving to the next inbox.", "error")
-                    break  # Move to the next inbox if retries are exceeded
-
-    log_message("Could not find OTP after max retries", "error")
-    return None  # Return None if OTP is not found after all retries
 
 def main():
     print_banner()
