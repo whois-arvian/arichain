@@ -46,14 +46,25 @@ class TempMailClient:
             'server': '1'
         }
         
-        response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
-        data = response.json()
-        print(f"Create email response: {data}") 
-        
-        self.email_address = data['address']
-        self.key = data['key']
-        
-        return data
+        try:
+            response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
+            response.raise_for_status()  # Pastikan status 200
+            data = response.json()
+            print(f"Create email response: {data}")  # Debugging response
+            
+            # Validasi respon JSON
+            if 'address' not in data or 'key' not in data:
+                raise ValueError(f"Invalid response structure: {data}")
+            
+            self.email_address = data['address']
+            self.key = data['key']
+            return data
+        except requests.exceptions.RequestException as e:
+            print(f"Request failed: {e}")
+            return {}
+        except ValueError as ve:
+            print(f"Response validation failed: {ve}")
+            return {}
 
     def create_inbox(self) -> dict:
         url = f"{self.base_url}/inbox"
