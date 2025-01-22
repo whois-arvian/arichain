@@ -3,3 +3,4 @@ colorama
 bs4
 names
 fake_useragent
+faker

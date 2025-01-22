@@ -7,10 +7,19 @@ from colorama import Fore, Style, init
 from datetime import datetime
 from bs4 import BeautifulSoup
 from fake_useragent import UserAgent
+from faker import Faker
 
 init()
+
+fake = Faker()
 ua = UserAgent()
 file_name = "response_output.txt"
+
+# Konfigurasi untuk retry saat mengambil domain
+max_retries = 3
+axios_config = {
+    'timeout': 5000  # Waktu tunggu (ms) untuk permintaan HTTP
+}
 
 ANDROID_USER_AGENTS = [
     'Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36',
@@ -69,6 +78,52 @@ def load_proxies():
 
 def get_random_proxy(proxies):
     return random.choice(proxies) if proxies else None
+
+def delay(seconds):
+    time.sleep(seconds)
+
+# Fungsi untuk mendapatkan domain acak dari API
+def get_domains():
+    attempt = 0
+    while attempt < max_retries:
+        try:
+            key = ''.join(random.choices(string.ascii_lowercase, k=2))  # 2 karakter acak
+            print(f"[*] Fetching domains with key: {key}")
+            
+            response = requests.get(f"https://generator.email/search.php?key={key}", headers={'User-Agent': 'Mozilla/5.0'})
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list) and len(data) > 0:
+                    return data
+            attempt += 1
+            delay(2)
+        except requests.exceptions.RequestException as e:
+            print(f"[!] Error fetching domains: {e}")
+            attempt += 1
+            delay(2)
+    
+    return []
+
+# Fungsi untuk mengencode string menjadi base64 (jika diperlukan)
+def encode_base64(s):
+    return s.encode('utf-8').encode('base64')
+
+# Fungsi untuk menghasilkan email acak
+def random_email(domain):
+    first_name = fake.first_name()
+    last_name = fake.last_name()
+
+    # Bersihkan nama depan dan belakang dari karakter selain huruf
+    clean_first_name = ''.join(filter(str.isalpha, first_name))
+    clean_last_name = ''.join(filter(str.isalpha, last_name))
+
+    random_num = random.randint(100, 999)
+    email_name = f"{clean_first_name.lower()}-AR-{clean_last_name.lower()}{random_num}"
+
+    return {
+        'name': email_name,
+        'email': f"{email_name}@{domain}"
+    }
 
 def generate_password():
     word = ''.join(random.choices(string.ascii_letters, k=5))
@@ -217,15 +272,17 @@ def process_single_referral(index, total_referrals, proxy_dict, target_address, 
     try:
         print(f"{Fore.CYAN}\nStarting new referral process\n{Style.RESET_ALL}")
 
-        # Dapatkan domain email acak dari fake-mail
-        domain = get_random_domain(proxy_dict)
-        if not domain:
+        # Dapatkan domain email acak
+        domains = get_domains()
+        if not domains:
             log("Failed to get a valid domain", Fore.RED, index, total_referrals)
             return False
+        domain = random.choice(domains)
 
         # Buat email baru dengan domain yang dipilih
-        email = generate_email(domain)
-        password = generate_password()
+        email_data = random_email(domain)
+        email = email_data['email']
+        password = generate_password()  # Pastikan ada fungsi generate_password()
         log(f"Generated account: {email}:{password}", Fore.CYAN, index, total_referrals)
 
         # Kirim OTP ke email
