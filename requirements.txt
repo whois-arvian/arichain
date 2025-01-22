@@ -2,4 +2,3 @@ requests
 colorama
 bs4
 names
-re
