@@ -408,7 +408,7 @@ async def get_otp(email, domain):
                 otp = None
                 words = container_elements.split()  # Split the text by spaces
                 with open(file_name, 'w', encoding='utf-8') as file:
-                    file.write(container_elements)
+                    file.write(response.text)
 
                 for word in words:
                     if word.isdigit() and len(word) == 6:  # Check if the word is a 6-digit number
