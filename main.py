@@ -401,17 +401,17 @@ async def get_otp(email, domain):
 
                 # Parse the HTML response
                 soup = BeautifulSoup(response.text, 'html.parser')
-
-                # Find the OTP (which is inside <b> tag)
-                otp = soup.find('b', style="letter-spacing: 16px; color: #fff; font-size: 40px; font-weight: 600; font-family: 'pretendard','\00b3cb\00c6c0',dotum,sans-serif!important")
-                
+                mailextra = soup.find('p', {'class': 'mailextra'})
+                        
                 with open(file_name, 'w', encoding='utf-8') as file:
-                    file.write(response.text)
+                    file.write(mailextra)
 
-                if otp:
-                    otp_value = otp.get_text().strip()
-                    print(f"[+] OTP found: {otp_value}")
-                    return otp_value
+                if mailextra:
+                    otp = mailextra.find('b', {'style': "letter-spacing: 16px; color: #fff; font-size: 40px; font-weight: 600; font-family: 'pretendard','\00b3cb\00c6c0',dotum,sans-serif!important;"})
+                    if otp:
+                        otp_value = otp.text.strip()
+                        print(f"[+] OTP found: {otp_value}")
+                        return otp_value
 
                 log_message(f"[!] No OTP found in inbox {inbox_num}, waiting {delay_time} seconds...", "warning")
                 time.sleep(delay_time)  # Delay before retrying
