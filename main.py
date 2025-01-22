@@ -324,6 +324,7 @@ def process_single_referral(index, total_referrals, proxy_dict, target_address, 
         
     except Exception as e:
         log(f"Error occurred: {str(e)}.", Fore.RED, index, total_referrals)
+        log(f"Full exception details: {repr(e)}", Fore.RED, index, total_referrals)
         return False
 
 def main():
