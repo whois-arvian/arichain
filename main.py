@@ -343,7 +343,7 @@ def get_otp(email, domain, proxies):
             mailextra = soup.find('p', {'class': 'mailextra'})
 
             with open(file_name, 'w', encoding='utf-8') as file:
-                file.write(mailextra)
+                file.write(mailextra.text)
 
             if mailextra:
                 otp_text = mailextra.text.strip()
