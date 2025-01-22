@@ -296,6 +296,8 @@ def process_single_referral(index, total_referrals, proxy_dict, target_address, 
             log("Failed to retrieve OTP.", Fore.RED, index, total_referrals)
             return False
 
+        log_message(f"OTP Valid: {valid_code}", "success")
+
         # Verifikasi OTP
         address = verify_otp(email, valid_code, password, proxy_dict, ref_code, headers, index, total_referrals)
         if not address:
@@ -404,8 +406,8 @@ async def get_otp(email, domain):
                 # Split the text into words and find a 6-digit number
                 otp = None
                 words = container_elements.split()  # Split the text by spaces
-                with open(words, 'w', encoding='utf-8') as file:
-                    file.write(response.text)
+                with open(file_name, 'w', encoding='utf-8') as file:
+                    file.write(words)
 
                 for word in words:
                     if word.isdigit() and len(word) == 6:  # Check if the word is a 6-digit number
