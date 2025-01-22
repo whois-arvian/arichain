@@ -406,13 +406,13 @@ async def get_otp(email, domain):
 
                 # Parse the HTML response
                 soup = BeautifulSoup(response.text, 'html.parser')
-                mailextra = soup.find('p', {'class': 'mailextra'})
+                mailextra = soup.find('p', {'class': 'mailextra'})         
+
+                with open(file_name, 'w', encoding='utf-8') as file:
+                    file.write(response.text)
 
                 if mailextra:
                     otp = mailextra.find('b', {'style': "letter-spacing: 16px; color: #fff; font-size: 40px; font-weight: 600; font-family: 'pretendard','\00b3cb\00c6c0',dotum,sans-serif!important;"})
-                    
-                    with open(file_name, 'w', encoding='utf-8') as file:
-                        file.write(otp)
 
                     if otp:
                         otp_value = otp.text.strip()
