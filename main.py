@@ -375,61 +375,74 @@ def generate_email(domain):
     log_message(f"Email created: {email}", "success")
     return email
 
-def get_otp(email, domain, max_retries=5, delay_time=3):
-    print(f"[*] Waiting for OTP email...")
+def get_otp(email, domain, proxies, max_retries=5, delay_time=3):
+    log_message("Waiting for OTP email...", "process")
+    
+    # Ensure max_retries is an integer
+    max_retries = int(max_retries)
 
     cookies = {
         'embx': f'[%22{email}%22]',
         'surl': f'{domain}/{email.split("@")[0]}'
     }
 
-    for inbox_num in range(1, 10):  # Check inbox from 1 to 9
+    for inbox_num in range(1, 10):  # Cek inbox dari 1 sampai 9
         attempt = 0
         while attempt < max_retries:
             try:
-                print(f"[*] Checking inbox {inbox_num}...")
+                log_message(f"[*] Checking inbox {inbox_num}...", "process")
 
-                # Make request to inbox
+                # Membuat request ke inbox
                 response = requests.get(
                     f'https://generator.email/inbox{inbox_num}/',
-                    headers={
+                    headers = {
                         'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-                        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                        'cookie': f'gid=GA1.2.2095327855.1735069411; embx=%5B%22{email}%22%5D; surl={domain}/{email}'
+                        'accept-encoding': 'gzip, deflate, br, zstd',
+                        'accept-language': 'en-US,en;q=0.9',
+                        'cache-control': 'max-age=0',
+                        'cookie': 'gid=GA1.2.2095327855.1735069411; __gads=ID=52c0ef95ece1dcd3:T=1723296851:RT=1735074556:S=ALNI_MY-N05jLZ5xHVJagROLPVaB7iMLRw; __gpi=UID=00000ebb7726ad8a:T=1723296851:RT=1735074556:S=ALNI_MZmpm9iDReVIrzNmydV67PPYNJhQw; __eoi=ID=50b40b8c429867d1:T=1723296851:RT=1735074556:S=AA-AfjYcohPcYMEyMXK2GgCw44zC; embx=%5B%${email}%40${domain}%22%2C%${email}%40${domain}%22%5D; _gat_gtag_UA_35796116_32=1; _ga=GA1.2.1660632963.1723296850; surl=${domain}/${email}; FCNEC=%5B%5B%22AKsRol-Lci8hCqIvO_xclbprHLQSsPjFOFt6Pu7w2kyTOo7Ahz83hFD5UlFG9kiq9pVZq23iGbdhLjdGucomp2CbWu2ZinNJRZYX3Xox3-XDAQ1imUiw8JveMOGFIHmDhh-EG1jHAFbEhKA-9N1aQd-DPg26Dn263A%3D%3D%22%5D%5D; _ga_1GPPTBHNKN=GS1.1.1735073618.15.1.1735074641.40.0.0',
+                        'priority': 'u=0, i',
+                        'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+                        'sec-ch-ua-mobile': '?0',
+                        'sec-ch-ua-platform': '"Windows"',
+                        'sec-fetch-dest': 'document',
+                        'sec-fetch-mode': 'navigate',
+                        'sec-fetch-site': 'same-origin',
+                        'sec-fetch-user': '?1',
+                        'upgrade-insecure-requests': '1',
+                        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
                     }
                 )
 
-                # Save response for debugging
+                # Menyimpan isi response untuk debugging
                 with open("response.html", 'w', encoding='utf-8') as file:
                     file.write(response.text)
 
-                # Parse HTML using BeautifulSoup
+                # Parsing HTML dengan BeautifulSoup
                 soup = BeautifulSoup(response.text, 'html.parser')
 
-                # Find elements that might contain OTP
+                # Cari elemen yang berisi OTP
                 container_elements = soup.find_all('td', style=lambda value: value and 'font-size:40px' in value)
                 if container_elements:
                     otp_text = container_elements[0].get_text(strip=True)
-                    otp = ''.join(filter(str.isdigit, otp_text))[:6]  # Take the first 6 digits
+                    otp = ''.join(filter(str.isdigit, otp_text))[:6]  # Ambil 6 digit pertama
 
                     if otp and len(otp) == 6:
-                        print(f"[+] OTP found: {otp}")
+                        log_message(f"OTP found: {otp}", "success")
                         return otp
 
-                print(f"[!] No OTP found in inbox {inbox_num}, retrying...")
-
-                # Wait before retrying
-                delay(delay_time)
+                log_message(f"[!] No OTP found in inbox {inbox_num}, retrying...", "warning")
+                time.sleep(delay_time)  # Tunggu beberapa detik sebelum mencoba lagi
                 break
 
             except Exception as e:
-                print(f"[!] Error checking inbox {inbox_num}: {str(e)}")
+                log_message(f"[!] Error checking inbox {inbox_num}: {str(e)}", "error")
                 attempt += 1
                 if attempt < max_retries:
-                    print(f"Retrying... ({attempt}/{max_retries})")
-                    delay(delay_time)
+                    log_message(f"Retrying... ({attempt}/{max_retries})", "warning")
+                    time.sleep(delay_time)  # Tunggu beberapa detik sebelum mencoba lagi
 
-    print("[!] Could not find OTP after max retries.")
+    log_message("Could not find OTP after max retries", "error")
     return None
 
 def main():
