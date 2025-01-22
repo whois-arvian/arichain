@@ -397,7 +397,6 @@ async def get_otp(email, domain):
                     f'https://emailfake.com/inbox{inbox_num}/',
                     headers=get_headers(),
                     cookies=cookies,
-                    impersonate="chrome110",
                     timeout=120
                 )
 
