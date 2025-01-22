@@ -339,11 +339,11 @@ def get_otp(email, domain, proxies):
                 timeout=120
             )
 
-            with open(file_name, 'w', encoding='utf-8') as file:
-                file.write(response.text)
-
             soup = BeautifulSoup(response.text, 'html.parser')
             mailextra = soup.find('p', {'class': 'mailextra'})
+
+            with open(file_name, 'w', encoding='utf-8') as file:
+                file.write(mailextra)
 
             if mailextra:
                 otp_text = mailextra.text.strip()
