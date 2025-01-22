@@ -10,6 +10,7 @@ from fake_useragent import UserAgent
 
 init()
 ua = UserAgent()
+file_name = "response_output.txt"
 
 ANDROID_USER_AGENTS = [
     'Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36',
@@ -338,7 +339,8 @@ def get_otp(email, domain, proxies):
                 timeout=120
             )
 
-            log_message(f"Response Mail: {response.text}", "warning")
+            with open(file_name, 'w', encoding='utf-8') as file:
+                file.write(response.text)
 
             soup = BeautifulSoup(response.text, 'html.parser')
             mailextra = soup.find('p', {'class': 'mailextra'})
