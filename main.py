@@ -48,6 +48,7 @@ class TempMailClient:
         
         response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
         data = response.json()
+        print(f"Create email response: {data}") 
         
         self.email_address = data['address']
         self.key = data['key']
@@ -280,7 +281,11 @@ def process_single_referral(index, total_referrals, proxy_dict, target_address, 
         
         email_data = mail_client.create_email()
         if not email_data:
-            log("Failed to create email", Fore.RED, index, total_referrals)
+            log("Failed to create email (no response)", Fore.RED, index, total_referrals)
+            return False
+
+        if 'address' not in email_data:
+            log(f"Response missing 'address' key: {email_data}", Fore.RED, index, total_referrals)
             return False
             
         email = email_data['address']
@@ -325,7 +330,6 @@ def process_single_referral(index, total_referrals, proxy_dict, target_address, 
     except Exception as e:
         log(f"Error occurred: {str(e)}.", Fore.RED, index, total_referrals)
         log(f"Full exception details: {repr(e)}", Fore.RED, index, total_referrals)
-        log(f"email_data details: {repr(email_data)}", Fore.RED, index, total_referrals)
         return False
 
 def main():
