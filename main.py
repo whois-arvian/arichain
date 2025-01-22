@@ -2,6 +2,8 @@ import requests
 import random
 import time
 import string
+import names
+import re
 from colorama import Fore, Style, init
 from datetime import datetime
 from bs4 import BeautifulSoup
@@ -21,101 +23,26 @@ ANDROID_USER_AGENTS = [
     'Mozilla/5.0 (Linux; Android 13; V2169) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36'
 ]
 
-class TempMailClient:
-    def __init__(self, proxy_dict=None):
-        self.base_url = "https://smailpro.com/app"
-        self.inbox_url = "https://app.sonjj.com/v1/temp_gmail"
-        self.headers = {
-            'accept': '*/*',
-            'accept-language': 'en-US,en;q=0.9',
-            'user-agent': random.choice(ANDROID_USER_AGENTS),
-            'origin': 'https://smailpro.com',
-            'referer': 'https://smailpro.com/'
-        }
-        self.proxy_dict = proxy_dict
-        self.email_address = None
-        self.key = None
-        self.payload = None
+model = None
+successful_accounts = 0
+failed_accounts = 0
+MAX_RETRIES = 10
 
-    def create_email(self) -> dict:
-        url = f"{self.base_url}/create"
-        params = {
-            'username': 'random',
-            'type': 'alias',
-            'domain': 'gmail.com',
-            'server': '1'
-        }
-        
-        try:
-            response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
-            response.raise_for_status()  # Pastikan status 200
-            data = response.json()
-            print(f"Create email response: {data}")  # Debugging response
-            
-            # Validasi respon JSON
-            if 'address' not in data or 'key' not in data:
-                raise ValueError(f"Invalid response structure: {data}")
-            
-            self.email_address = data['address']
-            self.key = data['key']
-            return data
-        except requests.exceptions.RequestException as e:
-            print(f"Request failed: {e}")
-            return {}
-        except ValueError as ve:
-            print(f"Response validation failed: {ve}")
-            return {}
-
-    def create_inbox(self) -> dict:
-        url = f"{self.base_url}/inbox"
-        payload = [{
-            "address": self.email_address,
-            "timestamp": int(time.time()),
-            "key": self.key
-        }]
-        
-        response = requests.post(url, json=payload, headers=self.headers, proxies=self.proxy_dict)
-        data = response.json()
-        
-        if data:
-            self.payload = data[0]['payload']
-        
-        return data[0]
-
-    def get_inbox(self) -> dict:
-        url = f"{self.inbox_url}/inbox"
-        params = {'payload': self.payload}
-        
-        response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
-        return response.json()
-
-    def get_message_token(self, mid: str) -> str:
-        url = f"{self.base_url}/message"
-        params = {
-            'email': self.email_address,
-            'mid': mid
-        }
-        
-        response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
-        return response.text
-
-    def get_message_content(self, token: str) -> dict:
-        url = f"{self.inbox_url}/message"
-        params = {'payload': token}
-        
-        response = requests.get(url, params=params, headers=self.headers, proxies=self.proxy_dict)
-        return response.json()
-
-    def extract_otp(self, html_content: str) -> str:
-        try:
-            soup = BeautifulSoup(html_content, 'html.parser')
-            otp_element = soup.find('b', style=lambda value: value and 'letter-spacing:16px' in value)
-            if otp_element:
-                return otp_element.text.strip()
-            return None
-        except Exception as e:
-            log(f"Error extracting OTP: {e}", Fore.RED)
-            return None
+def get_headers(token=None):
+    headers = {
+        'accept': '/',
+        'accept-language': 'en-US,en;q=0.9',
+        'priority': 'u=1, i',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"',
+        'sec-fetch-dest': 'empty',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-site': 'cross-site',
+        'user-agent': ua.chrome
+    }
+    if token:
+        headers['Authorization'] = f'Bearer {token}'
+    return headers
 
 def get_timestamp():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
