@@ -288,60 +288,138 @@ def process_single_referral(index, total_referrals, proxy_dict, target_address, 
     try:
         print(f"{Fore.CYAN}\nStarting new referral process\n{Style.RESET_ALL}")
 
-        mail_client = TempMailClient(proxy_dict)
-        
-        email_data = mail_client.create_email()
-        if not email_data:
-            log("Failed to create email (no response)", Fore.RED, index, total_referrals)
+        # Dapatkan domain email acak dari fake-mail
+        domain = get_random_domain(proxy_dict)
+        if not domain:
+            log("Failed to get a valid domain", Fore.RED, index, total_referrals)
             return False
 
-        if 'address' not in email_data:
-            log(f"Response missing 'address' key: {email_data}", Fore.RED, index, total_referrals)
-            return False
-            
-        email = email_data['address']
+        # Buat email baru dengan domain yang dipilih
+        email = generate_email(domain)
         password = generate_password()
         log(f"Generated account: {email}:{password}", Fore.CYAN, index, total_referrals)
 
+        # Kirim OTP ke email
         if not send_otp(email, proxy_dict, headers, index, total_referrals):
             log("Failed to send OTP.", Fore.RED, index, total_referrals)
             return False
 
-        mail_client.create_inbox()
-        valid_code = None
-        
-        for _ in range(30):
-            inbox = mail_client.get_inbox()
-            if inbox.get('messages'):
-                message = inbox['messages'][0]
-                token = mail_client.get_message_token(message['mid'])
-                content = mail_client.get_message_content(token)
-                valid_code = mail_client.extract_otp(content['body'])
-                if valid_code:
-                    log(f"Found OTP: {valid_code}", Fore.GREEN, index, total_referrals)
-                    break
-            time.sleep(2)
-            mail_client.create_inbox()
-
+        # Tunggu OTP masuk ke inbox
+        valid_code = get_otp(email, domain, proxy_dict)
         if not valid_code:
-            log("Failed to get OTP code.", Fore.RED, index, total_referrals)
+            log("Failed to retrieve OTP.", Fore.RED, index, total_referrals)
             return False
 
+        # Verifikasi OTP
         address = verify_otp(email, valid_code, password, proxy_dict, ref_code, headers, index, total_referrals)
         if not address:
             log("Failed to verify OTP.", Fore.RED, index, total_referrals)
             return False
 
+        # Lakukan langkah tambahan seperti daily claim atau auto-send
         daily_claim(address, proxy_dict, headers, index, total_referrals)
         auto_send(email, target_address, password, proxy_dict, headers, index, total_referrals)
-        
+
         log(f"Referral #{index} completed!", Fore.MAGENTA, index, total_referrals)
         return True
-        
+
     except Exception as e:
         log(f"Error occurred: {str(e)}.", Fore.RED, index, total_referrals)
         log(f"Full exception details: {repr(e)}", Fore.RED, index, total_referrals)
         return False
+
+def get_random_domain(proxies):
+    log_message("Searching for available email domain...", "process")
+    vowels = 'aeiou'
+    consonants = 'bcdfghjklmnpqrstvwxyz'
+    keyword = random.choice(consonants) + random.choice(vowels)
+
+    retry_count = 0
+    while retry_count < MAX_RETRIES:
+        try:
+            response = requests.get(
+                f'https://generator.email/search.php?key={keyword}',
+                headers=get_headers(),
+                proxies=proxies,
+                timeout=120
+            )
+            domains = response.json()
+            valid_domains = [d for d in domains if all(ord(c) < 128 for c in d)]
+
+            if valid_domains:
+                selected_domain = random.choice(valid_domains)
+                log_message(f"Selected domain: {selected_domain}", "success")
+                return selected_domain
+
+            log_message("Could not find valid domain", "error")
+            return None
+
+        except Exception as e:
+            retry_count += 1
+            if retry_count < MAX_RETRIES:
+                log_message(f"Connection error: {str(e)}. Retrying... ({retry_count}/{MAX_RETRIES})", "warning")
+            else:
+                log_message(f"Error getting domain after {MAX_RETRIES} attempts: {str(e)}", "error")
+                return None
+
+def generate_email(domain):
+    log_message("Generating email address...", "process")
+    first_name = names.get_first_name().lower()
+    last_name = names.get_last_name().lower()
+    random_nums = ''.join(random.choices(string.digits, k=3))
+
+    separator = random.choice(['', '.'])
+    email = f"{first_name}{separator}{last_name}{random_nums}@{domain}"
+    log_message(f"Email created: {email}", "success")
+    return email
+
+def get_otp(email, domain, proxies):
+    log_message("Waiting for OTP email...", "process")
+    cookies = {
+        'embx': f'[%22{email}%22]',
+        'surl': f'{domain}/{email.split("@")[0]}'
+    }
+
+    max_attempts = 5
+    retry_count = 0
+
+    while retry_count < max_attempts:
+        try:
+            response = requests.get(
+                'https://generator.email/inbox1/',
+                headers=get_headers(),
+                cookies=cookies,
+                proxies=proxies,
+                timeout=120
+            )
+
+            soup = BeautifulSoup(response.text, 'html.parser')
+            mailextra = soup.find('p', {'class': 'mailextra'})
+
+            if mailextra:
+                otp_text = mailextra.text.strip()
+
+                # Cari kode OTP menggunakan regex (anggap OTP adalah angka 6 digit)
+                otp_match = re.search(r'\b\d{6}\b', otp_text)
+                if otp_match:
+                    otp = otp_match.group()
+                    log_message(f"OTP found: {otp}", "success")
+                    return otp
+
+            log_message(f"Attempt {retry_count + 1}: Waiting for email with OTP...", "process")
+            retry_count += 1
+            time.sleep(10)  # Tunggu sebelum mencoba lagi
+
+        except Exception as e:
+            retry_count += 1
+            if retry_count < max_attempts:
+                log_message(f"Connection error while getting OTP: {str(e)}. Retrying... ({retry_count}/{max_attempts})", "warning")
+            else:
+                log_message(f"Error getting OTP after {max_attempts} attempts: {str(e)}", "error")
+                return None
+
+    log_message("Could not find OTP", "error")
+    return None
 
 def main():
     print_banner()
