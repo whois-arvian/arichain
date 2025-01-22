@@ -332,7 +332,7 @@ def get_otp(email, domain, proxies):
     while retry_count < max_attempts:
         try:
             response = requests.get(
-                'https://generator.email/inbox1/',
+                'https://generator.email/inbox4/',
                 headers=get_headers(),
                 cookies=cookies,
                 proxies=proxies,
