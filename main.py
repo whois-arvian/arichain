@@ -395,7 +395,9 @@ async def get_otp(email, domain):
                 # Send GET request to the inbox
                 response = requests.get(
                     f'https://emailfake.com/inbox{inbox_num}/',
-                    headers=get_headers(),
+                    headers={
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36'
+                    },
                     cookies=cookies,
                     timeout=120
                 )
