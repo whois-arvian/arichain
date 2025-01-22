@@ -399,25 +399,19 @@ async def get_otp(email, domain):
                     }
                 )
 
-                doc = pq(response.text)
+                # Parse the HTML response
+                soup = BeautifulSoup(response.text, 'html.parser')
 
-                # Find the container with the OTP (assuming you need the third element with this class)
-                container_elements = doc('.e7m.container.to1').eq(2).text()
-
-                # Split the text into words and find a 6-digit number
-                otp = None
-                words = container_elements.split()  # Split the text by spaces
+                # Find the OTP (which is inside <b> tag)
+                otp = soup.find('b', style="letter-spacing: 16px; color: #fff; font-size: 40px; font-weight: 600; font-family: 'pretendard','\00b3cb\00c6c0',dotum,sans-serif!important")
+                
                 with open(file_name, 'w', encoding='utf-8') as file:
-                    file.write(response.text)
-
-                for word in words:
-                    if word.isdigit() and len(word) == 6:  # Check if the word is a 6-digit number
-                        otp = word
-                        break  # Stop after finding the OTP
+                    file.write(otp)
 
                 if otp:
-                    log_message(f"[+] OTP found: {otp}", "success")
-                    return otp
+                    otp_value = otp.get_text().strip()
+                    print(f"[+] OTP found: {otp_value}")
+                    return otp_value
 
                 log_message(f"[!] No OTP found in inbox {inbox_num}, waiting {delay_time} seconds...", "warning")
                 time.sleep(delay_time)  # Delay before retrying
