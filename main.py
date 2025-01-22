@@ -92,7 +92,7 @@ def get_domains():
             key = ''.join(random.choices(string.ascii_lowercase, k=2))  # 2 karakter acak
             print(f"[*] Fetching domains with key: {key}")
             
-            response = requests.get(f"https://emailfake.com/search.php?key={key}", headers={'User-Agent': 'Mozilla/5.0'})
+            response = requests.get(f"https://generator.email/search.php?key={key}", headers={'User-Agent': 'Mozilla/5.0'})
             if response.status_code == 200:
                 data = response.json()
                 if isinstance(data, list) and len(data) > 0:
@@ -328,7 +328,7 @@ def get_random_domain(proxies):
     while retry_count < max_retries:
         try:
             response = requests.get(
-                f'https://emailfake.com/search.php?key={keyword}',
+                f'https://generator.email/search.php?key={keyword}',
                 headers=get_headers(),
                 proxies=proxies,
                 timeout=120
@@ -394,7 +394,14 @@ async def get_otp(email, domain):
 
                 # Send GET request to the inbox
                 response = requests.get(
-                    f'https://emailfake.com/inbox{inbox_num}/'
+                    f'https://generator.email/inbox{inbox_num}/',
+                    headers={
+                        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                        'accept-encoding': 'gzip, deflate, br, zstd',
+                        'accept-language': 'en-GB,en;q=0.8',
+                        'cookie': 'soundnotification=on; embx=%5B%22darlene.hill279%40dog.animail.kro.kr%22%5D; surl=dog.animail.kro.kr%2Fdarlene.hill279%2Ffb6e5e120006a51f24913a6c0ac5437b',  # Adjust this according to your cookie needs
+                        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36'
+                    }
                 )
 
                 # Parse the HTML response
