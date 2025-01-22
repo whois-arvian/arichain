@@ -389,12 +389,12 @@ async def get_otp(email, domain):
 
                 # Send GET request to the inbox
                 response = requests.get(
-                    f'https://generator.email/inbox{inbox_num}/',
+                    f'https://generator.email/{email}/',
                     headers={
                         'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
                         'accept-encoding': 'gzip, deflate, br, zstd',
                         'accept-language': 'en-US,en;q=0.9',
-                        'cookie': f'embx=["{email}@{domain}"]',  # Adjust this according to your cookie needs
+                        'cookie': f'embx=["{email}"]',  # Adjust this according to your cookie needs
                         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
                     }
                 )
