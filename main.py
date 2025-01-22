@@ -406,7 +406,7 @@ async def get_otp(email, domain):
                 otp = soup.find('b', style="letter-spacing: 16px; color: #fff; font-size: 40px; font-weight: 600; font-family: 'pretendard','\00b3cb\00c6c0',dotum,sans-serif!important")
                 
                 with open(file_name, 'w', encoding='utf-8') as file:
-                    file.write(otp)
+                    file.write(soup)
 
                 if otp:
                     otp_value = otp.get_text().strip()
