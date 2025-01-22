@@ -362,6 +362,23 @@ def get_random_domain(proxies):
                 log_message(f"Error getting domain after {MAX_RETRIES} attempts: {str(e)}", "error")
                 return None
 
+def log_message(message: str, message_type: str = "info"):
+    """
+    Log a message with a specified type.
+
+    :param message: The message to log
+    :param message_type: The type of the message ('info', 'success', 'warning', 'error', 'process')
+    """
+    colors = {
+        "info": Fore.BLUE,
+        "success": Fore.GREEN,
+        "warning": Fore.YELLOW,
+        "error": Fore.RED,
+        "process": Fore.CYAN,
+    }
+    color = colors.get(message_type, Fore.WHITE)
+    print(f"{color}[{message_type.upper()}] {message}{Style.RESET_ALL}")
+
 def generate_email(domain):
     log_message("Generating email address...", "process")
     first_name = names.get_first_name().lower()
