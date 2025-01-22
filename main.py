@@ -8,6 +8,7 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 from fake_useragent import UserAgent
 from faker import Faker
+from pyquery import PyQuery as pq
 
 init()
 
@@ -397,11 +398,10 @@ async def get_otp(email, domain):
                     }
                 )
 
-                # Parse the HTML response
-                soup = BeautifulSoup(response.text, 'html.parser')
+                doc = pq(response.text)
 
-                # Find the container with the OTP (adjust this selector based on actual HTML structure)
-                container_elements = soup.select('.e7m.container.to1')[2].get_text()  # Assuming the third one contains OTP
+                # Find the container with the OTP (assuming you need the third element with this class)
+                container_elements = doc('.e7m.container.to1').eq(2).text()
 
                 # Split the text into words and find a 6-digit number
                 otp = None
