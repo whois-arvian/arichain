@@ -37,7 +37,6 @@ ANDROID_USER_AGENTS = [
 model = None
 successful_accounts = 0
 failed_accounts = 0
-MAX_RETRIES = 10
 
 def get_headers(token=None):
     headers = {
@@ -321,7 +320,7 @@ def get_random_domain(proxies):
     keyword = random.choice(consonants) + random.choice(vowels)
 
     retry_count = 0
-    while retry_count < MAX_RETRIES:
+    while retry_count < max_retries:
         try:
             response = requests.get(
                 f'https://generator.email/search.php?key={keyword}',
@@ -342,10 +341,10 @@ def get_random_domain(proxies):
 
         except Exception as e:
             retry_count += 1
-            if retry_count < MAX_RETRIES:
-                log_message(f"Connection error: {str(e)}. Retrying... ({retry_count}/{MAX_RETRIES})", "warning")
+            if retry_count < max_retries:
+                log_message(f"Connection error: {str(e)}. Retrying... ({retry_count}/{max_retries})", "warning")
             else:
-                log_message(f"Error getting domain after {MAX_RETRIES} attempts: {str(e)}", "error")
+                log_message(f"Error getting domain after {max_retries} attempts: {str(e)}", "error")
                 return None
 
 def log_message(message: str, message_type: str = "info"):
