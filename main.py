@@ -319,54 +319,57 @@ def generate_email(domain):
     log_message(f"Email created: {email}", "success")
     return email
 
-def get_otp(email, domain, proxies):
+def get_otp(email, domain, proxies, max_retries=5, delay_time=3):
     log_message("Waiting for OTP email...", "process")
     cookies = {
         'embx': f'[%22{email}%22]',
         'surl': f'{domain}/{email.split("@")[0]}'
     }
 
-    max_attempts = 5
-    retry_count = 0
+    for inbox_num in range(1, 10):  # Cek inbox dari 1 sampai 9
+        attempt = 0
+        while attempt < max_retries:
+            try:
+                log_message(f"[*] Checking inbox {inbox_num}...", "process")
 
-    while retry_count < max_attempts:
-        try:
-            response = requests.get(
-                'https://generator.email/inbox4/',
-                headers=get_headers(),
-                cookies=cookies,
-                proxies=proxies,
-                timeout=120
-            )
+                # Membuat request ke inbox
+                response = requests.get(
+                    f'https://generator.email/inbox{inbox_num}/',
+                    headers=get_headers(),  # Pastikan get_headers() mengembalikan headers yang diperlukan
+                    cookies=cookies,
+                    proxies=proxies,
+                    timeout=120
+                )
 
-            with open(file_name, 'w', encoding='utf-8') as file:
-                file.write(response.text)
+                # Menyimpan isi response untuk debugging
+                with open("response.html", 'w', encoding='utf-8') as file:
+                    file.write(response.text)
 
-            soup = BeautifulSoup(response.text, 'html.parser')
-            mailextra = soup.find('p', {'class': 'mailextra'})
+                # Parsing HTML dengan BeautifulSoup
+                soup = BeautifulSoup(response.text, 'html.parser')
 
-            if mailextra:
-                otp_text = mailextra.text.strip()
+                # Cari elemen yang berisi OTP
+                container_elements = soup.find_all('td', style=lambda value: value and 'font-size:40px' in value)
+                if container_elements:
+                    otp_text = container_elements[0].get_text(strip=True)
+                    otp = ''.join(filter(str.isdigit, otp_text))[:6]  # Ambil 6 digit pertama
 
-                # Cari angka 6 digit langsung dalam teks tanpa menggunakan regex
-                otp = ''.join(filter(str.isdigit, otp_text))[:6]  # Ambil 6 digit pertama
-                if otp and len(otp) == 6:
-                    log_message(f"OTP found: {otp}", "success")
-                    return otp
+                    if otp and len(otp) == 6:
+                        log_message(f"OTP found: {otp}", "success")
+                        return otp
 
-            log_message(f"Attempt {retry_count + 1}: Waiting for email with OTP...", "process")
-            retry_count += 1
-            time.sleep(10)  # Tunggu sebelum mencoba lagi
+                log_message(f"[!] No OTP found in inbox {inbox_num}, retrying...", "warning")
+                time.sleep(delay_time)  # Tunggu beberapa detik sebelum mencoba lagi
+                break
 
-        except Exception as e:
-            retry_count += 1
-            if retry_count < max_attempts:
-                log_message(f"Connection error while getting OTP: {str(e)}. Retrying... ({retry_count}/{max_attempts})", "warning")
-            else:
-                log_message(f"Error getting OTP after {max_attempts} attempts: {str(e)}", "error")
-                return None
+            except Exception as e:
+                log_message(f"[!] Error checking inbox {inbox_num}: {str(e)}", "error")
+                attempt += 1
+                if attempt < max_retries:
+                    log_message(f"Retrying... ({attempt}/{max_retries})", "warning")
+                    time.sleep(delay_time)  # Tunggu beberapa detik sebelum mencoba lagi
 
-    log_message("Could not find OTP", "error")
+    log_message("Could not find OTP after max retries", "error")
     return None
 
 def main():
