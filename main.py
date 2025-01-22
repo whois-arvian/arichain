@@ -291,7 +291,7 @@ def process_single_referral(index, total_referrals, proxy_dict, target_address, 
             return False
 
         # Tunggu OTP masuk ke inbox
-        valid_code = get_otp(email, domain, proxy_dict)
+        valid_code = get_otp(email, domain)
         if not valid_code:
             log("Failed to retrieve OTP.", Fore.RED, index, total_referrals)
             return False
