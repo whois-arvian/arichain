@@ -343,10 +343,9 @@ def get_otp(email, domain, proxies):
             if mailextra:
                 otp_text = mailextra.text.strip()
 
-                # Cari kode OTP menggunakan regex (anggap OTP adalah angka 6 digit)
-                otp_match = re.search(r'\b\d{6}\b', otp_text)
-                if otp_match:
-                    otp = otp_match.group()
+                # Cari angka 6 digit langsung dalam teks tanpa menggunakan regex
+                otp = ''.join(filter(str.isdigit, otp_text))[:6]  # Ambil 6 digit pertama
+                if otp and len(otp) == 6:
                     log_message(f"OTP found: {otp}", "success")
                     return otp
 
