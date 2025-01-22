@@ -338,6 +338,8 @@ def get_otp(email, domain, proxies):
                 timeout=120
             )
 
+            log_message(f"Response Mail: {response.text}", "warning")
+
             soup = BeautifulSoup(response.text, 'html.parser')
             mailextra = soup.find('p', {'class': 'mailextra'})
 
