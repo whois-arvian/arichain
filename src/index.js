@@ -25,10 +25,14 @@ async function main() {
   const use2Captcha = captchaSolverResponse === "1";
   const useAntiCaptcha = captchaSolverResponse === "2";
   const useGemini = captchaSolverResponse === "3";
-  const refCode = await prompt(chalk.yellow("Enter Referral Code: "));
-  const toAddress = await prompt(
-    chalk.yellow("Enter target address for token transfer: ")
-  );
+  // const refCode = await prompt(chalk.yellow("Enter Referral Code: "));
+  // const toAddress = await prompt(
+  //   chalk.yellow("Enter target address for token transfer: ")
+  // );
+
+  const refCode = "6790105b401b3";
+  const toAddress = "ARW8aoHAoS6nAbn8dXVruS75wH5smx6obZvK1Xdwv6iYUbJ9Mf9dV";
+
   const count = parseInt(await prompt(chalk.yellow("How many do you want? ")));
   const proxiesLoaded = loadProxies();
   if (!proxiesLoaded) {
