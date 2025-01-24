@@ -1,7 +1,0 @@
-requests
-colorama
-bs4
-names
-fake_useragent
-faker
-pyquery
